@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ultimate Tic-Tac-Toe</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#14171C; --panel:#1E232B; --cell:#262C36; --cell-hover:#2E3542;
+  --x:#FF6B5E; --o:#4ECDC4; --active:#F4C95D; --text:#ECECEA; --muted:#7D8494; --line:#333A47;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;}
+html{height:100%; scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  margin:0; min-height:100%; background:var(--bg); color:var(--text);
+  font-family:'Space Grotesk',system-ui,sans-serif;
+  display:flex; align-items:center; justify-content:center; padding:24px 16px;
+}
+.wrap{width:100%; max-width:480px; display:flex; flex-direction:column; align-items:center;}
+h1{font-size:1.5rem; font-weight:700; margin:0 0 2px; letter-spacing:-0.01em;}
+.sub{color:var(--muted); font-size:0.85rem; margin-bottom:20px; text-align:center;}
+
+.status{
+  display:flex; align-items:center; gap:10px; margin-bottom:16px; min-height:34px;
+}
+.turn-badge{
+  width:30px; height:30px; border-radius:8px; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:1.1rem; background:var(--panel); border:2px solid var(--line);
+}
+.turn-badge.x{color:var(--x); border-color:var(--x);}
+.turn-badge.o{color:var(--o); border-color:var(--o);}
+.status-text{font-size:0.95rem;}
+.status-text .win-x{color:var(--x); font-weight:700;}
+.status-text .win-o{color:var(--o); font-weight:700;}
+
+.meta-board{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:8px;
+  background:var(--panel); padding:8px; border-radius:16px; width:100%; aspect-ratio:1/1;
+}
+.mini-board{
+  display:grid; grid-template-columns:repeat(3,1fr); gap:4px;
+  background:var(--cell); border-radius:9px; padding:5px; position:relative;
+  border:2px solid transparent; transition:border-color .2s, background .2s;
+}
+.mini-board.active{ border-color:var(--active); background:#2A2410; }
+.mini-board.won-x, .mini-board.won-o, .mini-board.drawn{ padding:0; }
+.mini-board.won-x{ background:rgba(255,107,94,0.14); }
+.mini-board.won-o{ background:rgba(78,205,196,0.14); }
+.mini-board.drawn{ background:#20242c; }
+.mini-cell{
+  background:#1B1F27; border-radius:5px; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:clamp(0.9rem, 4vw, 1.3rem); cursor:pointer; border:none; padding:0; color:var(--text);
+}
+.mini-board.active .mini-cell:hover:empty{ background:var(--cell-hover); }
+.mini-board.active .mini-cell{ cursor:pointer; }
+.mini-board:not(.active) .mini-cell{ cursor:default; }
+.mini-cell.x{ color:var(--x); }
+.mini-cell.o{ color:var(--o); }
+.mini-cell:disabled{ cursor:default; }
+
+.mini-board-overlay{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:clamp(2rem, 9vw, 3rem); font-weight:700; border-radius:9px;
+}
+.mini-board-overlay.x{ color:var(--x); }
+.mini-board-overlay.o{ color:var(--o); }
+.mini-board-overlay.draw{ color:var(--muted); font-size:1rem; }
+
+.controls{ margin-top:22px; display:flex; gap:10px; }
+button.action{
+  background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:10px;
+  padding:10px 18px; font-family:inherit; font-weight:500; font-size:0.9rem; cursor:pointer;
+}
+button.action:hover{ background:var(--cell); }
+button.action.primary{ background:var(--active); color:#1A1204; border:none; }
+button.action.primary:hover{ filter:brightness(1.07); }
+
+footer{ margin-top:26px; color:var(--muted); font-size:0.76rem; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Ultimate Tic-Tac-Toe</h1>
+  <div class="sub">Win a small board to claim it. Where you play sends your opponent to their next board.</div>
+
+  <div class="status">
+    <div class="turn-badge x" id="turnBadge">X</div>
+    <div class="status-text" id="statusText">X's turn — play anywhere</div>
+  </div>
+
+  <div class="meta-board" id="metaBoard"></div>
+
+  <div class="controls">
+    <button class="action primary" id="newGameBtn">New game</button>
+  </div>
+  <footer>Prototype built for ME-871 · Opportunity Identification assignment</footer>
+</div>
+
+<script>
+(function(){
+  const metaEl = document.getElementById('metaBoard');
+  const statusEl = document.getElementById('statusText');
+  const badgeEl = document.getElementById('turnBadge');
+
+  let boards, boardWinners, activeBoard, currentPlayer, metaWinner, gameOver;
+
+  function init(){
+    boards = Array.from({length:9}, ()=>Array(9).fill(null));
+    boardWinners = Array(9).fill(null); // null | 'X' | 'O' | 'draw'
+    activeBoard = null; // null = any open board
+    currentPlayer = 'X';
+    metaWinner = null;
+    gameOver = false;
+    render();
+  }
+
+  const LINES = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+
+  function checkWinner(cells){
+    for(const [a,b,c] of LINES){
+      if(cells[a] && cells[a]===cells[b] && cells[b]===cells[c]) return cells[a];
+    }
+    if(cells.every(c=>c!==null)) return 'draw';
+    return null;
+  }
+
+  function play(boardIdx, cellIdx){
+    if(gameOver) return;
+    if(boardWinners[boardIdx]) return;
+    if(activeBoard!==null && activeBoard!==boardIdx) return;
+    if(boards[boardIdx][cellIdx]) return;
+
+    boards[boardIdx][cellIdx] = currentPlayer;
+    const w = checkWinner(boards[boardIdx]);
+    if(w) boardWinners[boardIdx] = w;
+
+    const meta = checkWinner(boardWinners.map(x=> x==='draw' ? null : x));
+    // check meta draw separately (all boards decided, no winner)
+    let metaDraw = boardWinners.every(x=>x!==null) && !meta;
+
+    if(meta){
+      metaWinner = meta; gameOver = true;
+    } else if(metaDraw){
+      metaWinner = 'draw'; gameOver = true;
+    } else {
+      // determine next active board
+      const next = cellIdx;
+      activeBoard = boardWinners[next] ? null : next;
+      currentPlayer = currentPlayer==='X' ? 'O' : 'X';
+    }
+    render();
+  }
+
+  function render(){
+    metaEl.innerHTML='';
+    for(let b=0;b<9;b++){
+      const mb = document.createElement('div');
+      mb.className='mini-board';
+      const winner = boardWinners[b];
+      const isActive = !gameOver && !winner && (activeBoard===null || activeBoard===b);
+      if(isActive) mb.classList.add('active');
+      if(winner==='X') mb.classList.add('won-x');
+      if(winner==='O') mb.classList.add('won-o');
+      if(winner==='draw') mb.classList.add('drawn');
+
+      if(winner && winner!=='draw'){
+        const ov = document.createElement('div');
+        ov.className='mini-board-overlay '+winner.toLowerCase();
+        ov.textContent = winner;
+        mb.appendChild(ov);
+      } else if(winner==='draw'){
+        const ov = document.createElement('div');
+        ov.className='mini-board-overlay draw';
+        ov.textContent = 'draw';
+        mb.appendChild(ov);
+      } else {
+        for(let c=0;c<9;c++){
+          const btn = document.createElement('button');
+          const val = boards[b][c];
+          btn.className='mini-cell'+(val? ' '+val.toLowerCase():'');
+          btn.textContent = val || '';
+          btn.disabled = !isActive || !!val;
+          btn.addEventListener('click', ()=>play(b,c));
+          mb.appendChild(btn);
+        }
+      }
+      metaEl.appendChild(mb);
+    }
+
+    badgeEl.textContent = currentPlayer;
+    badgeEl.className = 'turn-badge '+currentPlayer.toLowerCase();
+
+    if(gameOver){
+      if(metaWinner==='draw'){
+        statusEl.innerHTML = "It's a draw — well played.";
+      } else {
+        statusEl.innerHTML = `<span class="win-${metaWinner.toLowerCase()}">${metaWinner}</span> wins the game!`;
+      }
+    } else {
+      const hint = activeBoard===null ? 'play anywhere' : `play in board ${activeBoard+1}`;
+      statusEl.textContent = `${currentPlayer}'s turn — ${hint}`;
+    }
+  }
+
+  document.getElementById('newGameBtn').addEventListener('click', init);
+  init();
+})();
+</script>
+</body>
+</html>
